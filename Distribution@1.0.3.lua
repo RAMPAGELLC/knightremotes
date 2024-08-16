@@ -12,7 +12,7 @@
  Written by Metatable (@vq9o), Epicness and contributors.
  License: MIT
 
- Usage:
+ Remotes Usage:
  local Remotes = require(to.remotes/)
 	Remotes:GetAsync(RemoteName: string) -> await RemoteAPI
 		yields thread until recives RemoteAPI successfully.
@@ -22,6 +22,11 @@
 	Remotes:FireAll(RemoteName: string, ...) -> (any...)
 	Remotes:Connect(RemoteName: string, callback: () -> void | nil | boolean) -> void
 	Remotes:Register(RemoteName: string, RemoteClass: string, Callback: any) -> void
+
+RemoteAPI Usage (Recieved from Get/GetAsync):
+	RemoteAPI:Fire(...) -> (any...)
+	RemoteAPI:FireAll(...) -> (any...)
+	RemoteAPI:FireAllNearby(position: Vector3, maxDistance: number | boolean, ...) -> (any...)
 ]]
 
 local Service = {
