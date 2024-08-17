@@ -27,6 +27,8 @@ RemoteAPI Usage (Recieved from Get/GetAsync):
 	RemoteAPI:Fire(...) -> (any...)
 	RemoteAPI:FireAll(...) -> (any...)
 	RemoteAPI:FireAllNearby(position: Vector3, maxDistance: number | boolean, ...) -> (any...)
+	RemoteAPI:Connect(callback: () -> void | nil | boolean) -> void
+	RemoteAPI:OnDestroying(callback: (RemoteName: string) -> void) -> void
 	RemoteAPI:Destroy()
 ]]
 
@@ -37,7 +39,7 @@ local Service = {
 		Description = "Remote Service for handling remotes across client and server.",
 	},
 	AutoRegisterIfDoesNotExist = true, -- Server :Fire() only. RemoteFunction is default. Useless unless client connects AFTER auto-creation.
-	RemoteAPICache = {}
+	RemoteAPICache = {},
 }
 
 local Players = game:GetService("Players")
@@ -50,13 +52,14 @@ local Maid = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Ma
 local Events = Knight:FindFirstChild("Events") or Instance.new("Folder", Knight)
 Events.Name = "Events"
 
-export type KnightRemote = RemoteFunction | RemoteEvent | UnreliableRemoteEvent | BindableEvent | BindableFunction;
+export type KnightRemote = RemoteFunction | RemoteEvent | UnreliableRemoteEvent | BindableEvent | BindableFunction
 export type void = nil
 export type RemoteAPI = {
-	Destroy: () -> void;
-	Fire: (any...) -> (any...);
-	FireAll: (any...) -> (any...);
-	FireAllNearby: (Vector3, number | boolean, any...) -> (any...);
+	Destroy: () -> void,
+	Fire: (...any) -> any...,
+	FireAll: (...any) -> any...,
+	FireAllNearby: (Vector3, number | boolean, ...any) -> any...,
+	OnDestroying: (callback: (RemoteName: string) -> void) -> void,
 }
 
 local function GetRemote(RemoteName: string): KnightRemote | boolean
@@ -88,44 +91,57 @@ function RemoteAPI.new(Remote: KnightRemote)
 	local self = setmetatable({}, RemoteAPI)
 
 	self.Maid = Maid.new()
-	self.Remote = Remote;
-	self.RemoteName= self.Remote.Name;
+	self.Remote = Remote
+	self.RemoteName = self.Remote.Name
+	self.DestroyingCallbacks = {}
 
 	self.Maid:GiveTask(self.Remote.Destroying:Connect(function()
-		return self:Destroy();
+		return self:Destroy()
 	end))
 
-	return self;
+	return self
 end
 
-function RemoteAPI:FireAllNearby(...): (any...)
+function RemoteAPI:Connect(callback: () -> void | nil | boolean): void
+	return Service:Connect(callback)
+end
+
+function RemoteAPI:OnDestroying(callback: (RemoteName: string) -> void): void
+	table.insert(self.DestroyingCallbacks, callback)
+end
+
+function RemoteAPI:FireAllNearby(...): any...
 	return Service:FireAllNearby(self.RemoteName, ...)
 end
 
-function RemoteAPI:FireAll(...): (any...)
+function RemoteAPI:FireAll(...): any...
 	return Service:FireAll(self.RemoteName, ...)
 end
 
-function RemoteAPI:Fire(...): (any...)
+function RemoteAPI:Fire(...): any...
 	return Service:Fire(self.RemoteName, ...)
 end
 
 function RemoteAPI:Destroy()
-	Service.RemoteAPICache[self.RemoteName] = nil;
-	self = nil;	
+	for _, v in pairs(self.DestroyingCallbacks) do
+		v(self.RemoteName)
+	end
+
+	Service.RemoteAPICache[self.RemoteName] = nil
+	self = nil
 end
 
 function Service:GetAsync(RemoteName: string): RemoteAPI | boolean
 	repeat
-		task.wait(.1)
+		task.wait(0.1)
 	until typeof(Service:Get(RemoteName) ~= "boolean")
 
-	return Service:Get(RemoteName);
+	return Service:Get(RemoteName)
 end
 
 function Service:Get(RemoteName: string, SilenceWarnings: boolean?): RemoteAPI | boolean
 	if Service.RemoteAPICache[RemoteName] ~= nil then
-		return Service.RemoteAPICache[RemoteName];
+		return Service.RemoteAPICache[RemoteName]
 	end
 
 	if SilenceWarnings == nil then
@@ -143,19 +159,19 @@ function Service:Get(RemoteName: string, SilenceWarnings: boolean?): RemoteAPI |
 		return false
 	end
 
-	Service.RemoteAPICache[RemoteName] = RemoteAPI.new(remote);
+	Service.RemoteAPICache[RemoteName] = RemoteAPI.new(remote)
 
-	return Service.RemoteAPICache[RemoteName];
+	return Service.RemoteAPICache[RemoteName]
 end
 
 function Service:IsRegistered(RemoteName: string): boolean
 	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
 	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
-	
+
 	return typeof(GetRemote(RemoteName)) ~= "boolean"
 end
 
-function Service:Fire(RemoteName: string, ...): (any...)
+function Service:Fire(RemoteName: string, ...): any...
 	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
 	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
 
@@ -223,7 +239,7 @@ function Service:Fire(RemoteName: string, ...): (any...)
 	end
 end
 
-function Service:FireAllNearby(RemoteName: string, position: Vector3, maxDistance: number | boolean, ...): (any...)
+function Service:FireAllNearby(RemoteName: string, position: Vector3, maxDistance: number | boolean, ...): any...
 	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
 	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
 
@@ -252,7 +268,7 @@ function Service:FireAllNearby(RemoteName: string, position: Vector3, maxDistanc
 	end
 end
 
-function Service:FireAll(RemoteName: string, ...): (any...)
+function Service:FireAll(RemoteName: string, ...): any...
 	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
 	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
 
