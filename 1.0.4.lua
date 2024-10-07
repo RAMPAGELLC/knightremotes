@@ -430,7 +430,11 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 				end
 				
 				-- Call the callback with the appropriate arguments
-				return callback(playerArg, table.unpack(args))
+				if RunService:IsServer() then
+					return callback(playerArg, table.unpack(args))
+				else
+					return callback(table.unpack(args))
+				end
 			end)
 		end
 	end
