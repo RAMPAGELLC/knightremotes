@@ -2,6 +2,7 @@
 Standalone version of the Knight Remote System.
 
 * The Knight framework (**not required**): https://github.com/RAMPAGELLC/knight/tree/main
+* Documentation: https://knight.metatable.dev/luau-api/knight-remotes-api
 
 # License
 ```
