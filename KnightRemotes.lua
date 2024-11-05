@@ -10,28 +10,10 @@
  
  (©) Copyright 2024 RAMPAGE Interactive, all rights reserved.
  Written by Metatable (@vq9o), Epicness and contributors.
+
  License: MIT
-
- Remotes Usage:
- local Remotes = require(to.remotes/)
-	Remotes:GetAsync(RemoteName: string) -> await RemoteAPI
-		yields thread until recives RemoteAPI successfully.
-	Remotes:Get(RemoteName: string) -> RemoteAPI | boolean
-	Remotes:Fire(RemoteName: string, ...) -> (any...)
-	Remotes:FireAllNearby(RemoteName: string, position: Vector3, maxDistance: number | boolean, ...) -> (any...)
-	Remotes:FireAll(RemoteName: string, ...) -> (any...)
-	Remotes:Connect(RemoteName: string, callback: () -> void | nil | boolean) -> void
-	Remotes:Register(RemoteName: string, RemoteClass: string, Callback: any) -> void
-	Remotes:RegisterMiddleware(Target: string, Callback: (Player: Player, ...any) -> boolean): void
-	Remotes:UnregisterMiddleware(Target: string): void
-
-RemoteAPI Usage (Recieved from Get/GetAsync):
-	RemoteAPI:Fire(...) -> (any...)
-	RemoteAPI:FireAll(...) -> (any...)
-	RemoteAPI:FireAllNearby(position: Vector3, maxDistance: number | boolean, ...) -> (any...)
-	RemoteAPI:Connect(callback: () -> void | nil | boolean) -> void
-	RemoteAPI:OnDestroying(callback: (RemoteName: string) -> void) -> void
-	RemoteAPI:Destroy()
+ Documentation: https://knight.metatable.dev/luau-api/knight-remotes-api
+ GitHub: https://github.com/RAMPAGELLC/knightremotes/tree/main
 ]]
 
 local Service = {
