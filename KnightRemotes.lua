@@ -10,10 +10,28 @@
  
  (©) Copyright 2024 RAMPAGE Interactive, all rights reserved.
  Written by Metatable (@vq9o), Epicness and contributors.
-
  License: MIT
- Documentation: https://knight.metatable.dev/luau-api/knight-remotes-api
- GitHub: https://github.com/RAMPAGELLC/knightremotes/tree/main
+
+ Remotes Usage:
+ local Remotes = require(to.remotes/)
+	Remotes:GetAsync(RemoteName: string) -> await RemoteAPI
+		yields thread until recives RemoteAPI successfully.
+	Remotes:Get(RemoteName: string) -> RemoteAPI | boolean
+	Remotes:Fire(RemoteName: string, ...) -> (any...)
+	Remotes:FireAllNearby(RemoteName: string, position: Vector3, maxDistance: number | boolean, ...) -> (any...)
+	Remotes:FireAll(RemoteName: string, ...) -> (any...)
+	Remotes:Connect(RemoteName: string, callback: () -> void | nil | boolean) -> void
+	Remotes:Register(RemoteName: string, RemoteClass: string, Callback: any) -> void
+	Remotes:RegisterMiddleware(Target: string, Callback: (Player: Player, ...any) -> boolean): void
+	Remotes:UnregisterMiddleware(Target: string): void
+
+RemoteAPI Usage (Recieved from Get/GetAsync):
+	RemoteAPI:Fire(...) -> (any...)
+	RemoteAPI:FireAll(...) -> (any...)
+	RemoteAPI:FireAllNearby(position: Vector3, maxDistance: number | boolean, ...) -> (any...)
+	RemoteAPI:Connect(callback: () -> void | nil | boolean) -> void
+	RemoteAPI:OnDestroying(callback: (RemoteName: string) -> void) -> void
+	RemoteAPI:Destroy()
 ]]
 
 local Service = {
@@ -61,7 +79,7 @@ local function GetRemote(RemoteName: string): KnightRemote | boolean
 	if RemoteName:find(";") then
 		RemoteName = RemoteName:gsub(";", "_")
 	end
-
+	
 	if RemoteName:find(":") then
 		RemoteName = RemoteName:gsub(":", "_")
 	end
@@ -150,7 +168,10 @@ function RemoteAPI:Destroy()
 	self = nil
 end
 
-function Service:RegisterMiddleware(Target: string, Callback: (RemoteName: string, Player: Player, ...any) -> boolean): void
+function Service:RegisterMiddleware(
+	Target: string,
+	Callback: (RemoteName: string, Player: Player, ...any) -> boolean
+): void
 	if Target ~= "*" then
 		assert(
 			self:IsRegistered(Target) == true,
@@ -374,7 +395,12 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
 
 					if middleware and not middleware(remote.Name, player, ...) then
-						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(remote.Name, player.Name))
+						warn(
+							("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(
+								remote.Name,
+								player.Name
+							)
+						)
 						return
 					end
 
@@ -385,7 +411,12 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
 
 					if middleware and not middleware(remote.Name, Players.LocalPlayer, ...) then
-						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(remote.Name, Players.LocalPlayer.Name))
+						warn(
+							("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(
+								remote.Name,
+								Players.LocalPlayer.Name
+							)
+						)
 						return
 					end
 
@@ -397,26 +428,18 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 		if signal then
 			return signal:Connect(function(...)
 				local args = table.pack(...)
-				local playerArg = RunService:IsServer() and args[1] or Players.LocalPlayer or nil;
-				
-				-- Remove player from args if on server
-				if RunService:IsServer() and (remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent")) then
-					table.remove(args, 1)
-				end
+				local playerArg: Player? = RunService:IsServer() and args[1] or Players.LocalPlayer or nil
 
 				-- Handle middleware
 				local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
-				if middleware and not middleware(remote.Name, playerArg, table.unpack(args)) then
+				
+				if middleware and not middleware(remote.Name, playerArg, ...) then
 					warn(("[Knight:Remotes]: Dropped Event '%s' as it failed middleware!"):format(remote.Name))
 					return
 				end
-				
+
 				-- Call the callback with the appropriate arguments
-				if RunService:IsServer() then
-					return callback(playerArg, table.unpack(args))
-				else
-					return callback(table.unpack(args))
-				end
+				return callback(...)
 			end)
 		end
 	end
@@ -429,7 +452,7 @@ function Service:Unregister(RemoteName: string): void
 	if RemoteName:find(";") then
 		RemoteName = RemoteName:gsub(";", "_")
 	end
-
+	
 	if RemoteName:find(":") then
 		RemoteName = RemoteName:gsub(":", "_")
 	end
@@ -457,6 +480,7 @@ function Service:Register(RemoteName: string, RemoteClass: string, Callback: any
 	end
 
 	if Events:FindFirstChild(RemoteName) then
+		warn(("[Knight:Remotes]: Remote '%s' already exists!"):format(RemoteName), debug.traceback())
 		return
 	end
 
