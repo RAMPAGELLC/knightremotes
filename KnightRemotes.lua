@@ -22,7 +22,7 @@
 	Remotes:FireAll(RemoteName: string, ...) -> (any...)
 	Remotes:Connect(RemoteName: string, callback: () -> void | nil | boolean) -> void
 	Remotes:Register(RemoteName: string, RemoteClass: string, Callback: any) -> void
-	Remotes:RegisterMiddleware(Target: string, Callback: (Player: Player, ...any) -> boolean): void
+	Remotes:RegisterMiddleware(Target: string, Callback: (RemoteName: string, Player: Player, ...any) -> boolean): void
 	Remotes:UnregisterMiddleware(Target: string): void
 
 RemoteAPI Usage (Recieved from Get/GetAsync):
@@ -79,7 +79,7 @@ local function GetRemote(RemoteName: string): KnightRemote | boolean
 	if RemoteName:find(";") then
 		RemoteName = RemoteName:gsub(";", "_")
 	end
-	
+
 	if RemoteName:find(":") then
 		RemoteName = RemoteName:gsub(":", "_")
 	end
@@ -168,11 +168,17 @@ function RemoteAPI:Destroy()
 	self = nil
 end
 
+function Service:FireAllInGroup(RemoteName: string, Targets: { Player }, ...)
+	for _, player in pairs(Targets) do
+		Service:Fire(RemoteName, player, ...)
+	end
+end
+
 function Service:RegisterMiddleware(
 	Target: string,
 	Callback: (RemoteName: string, Player: Player, ...any) -> boolean
 ): void
-	if Target ~= "*" then
+	if Target ~= "*" and not Target:find("*") then
 		assert(
 			self:IsRegistered(Target) == true,
 			("[Knight:Remotes]: Failed to register middleware for event '%s' as it does not exist!"):format(Target)
@@ -392,7 +398,7 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 			if RunService:IsServer() then
 				remote.OnServerInvoke = function(player, ...)
 					local args = table.pack(player, ...)
-					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
+					local middleware = self:GetMiddlewareForRemoteName(remote.Name)
 
 					if middleware and not middleware(remote.Name, player, ...) then
 						warn(
@@ -408,7 +414,7 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 				end
 			else
 				remote.OnClientInvoke = function(...)
-					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
+					local middleware = self:GetMiddlewareForRemoteName(remote.Name)
 
 					if middleware and not middleware(remote.Name, Players.LocalPlayer, ...) then
 						warn(
@@ -431,8 +437,8 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 				local playerArg: Player? = RunService:IsServer() and args[1] or Players.LocalPlayer or nil
 
 				-- Handle middleware
-				local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
-				
+				local middleware = self:GetMiddlewareForRemoteName(remote.Name)
+
 				if middleware and not middleware(remote.Name, playerArg, ...) then
 					warn(("[Knight:Remotes]: Dropped Event '%s' as it failed middleware!"):format(remote.Name))
 					return
@@ -445,6 +451,41 @@ function Service:Connect(RemoteName: string, callback: (any...) -> void | nil | 
 	end
 end
 
+function Service:GetMiddlewareForRemoteName(RemoteName: string): (Player, ...any) -> boolean
+	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
+	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
+
+	-- Attempt to locate specific middleware
+	local middleware = self.Middleware[RemoteName]
+
+	if middleware then
+		return middleware
+	end
+
+	-- Attempt to locate Region:* middleware
+	if not middleware then
+		for key, value in pairs(self.Middleware) do
+			local regionPrefix, star = key:match("^(.-):(%*)$")
+
+			if not regionPrefix or not star then
+				continue
+			end
+
+			if RemoteName:sub(1, #regionPrefix) == regionPrefix then
+				middleware = value
+				break
+			end
+		end
+	end
+
+	-- Otherwise default to global middleware
+	if not middleware then
+		middleware = self.Middleware["*"]
+	end
+
+	return middleware
+end
+
 function Service:Unregister(RemoteName: string): void
 	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
 	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
@@ -452,7 +493,7 @@ function Service:Unregister(RemoteName: string): void
 	if RemoteName:find(";") then
 		RemoteName = RemoteName:gsub(";", "_")
 	end
-	
+
 	if RemoteName:find(":") then
 		RemoteName = RemoteName:gsub(":", "_")
 	end
@@ -493,6 +534,33 @@ function Service:Register(RemoteName: string, RemoteClass: string, Callback: any
 	end
 
 	return Service:Connect(RemoteName, Callback)
+end
+
+function Service:RegisterRemoteAPI(RemoteName: string, RemoteClass: string): RemoteAPI?
+	assert(RemoteName ~= nil, "[Knight:Remotes]: RemoteName is nil")
+	assert(RemoteClass ~= nil, "[Knight:Remotes]: RemoteClass is nil")
+
+	assert(typeof(RemoteName) == "string", "[Knight:Remotes]: RemoteName must be a string")
+	assert(typeof(RemoteClass) == "string", "[Knight:Remotes]: RemoteClass must be a string")
+
+	if RemoteName:find(";") then
+		RemoteName = RemoteName:gsub(";", "_")
+	end
+
+	if RemoteName:find(":") then
+		RemoteName = RemoteName:gsub(":", "_")
+	end
+
+	if Events:FindFirstChild(RemoteName) then
+		warn(("[Knight:Remotes]: Remote '%s' already exists!"):format(RemoteName), debug.traceback())
+		return
+	end
+
+	local Remote = Instance.new(RemoteClass)
+	Remote.Parent = Events
+	Remote.Name = RemoteName
+
+	return RemoteAPI.new(Remote)
 end
 
 return Service
