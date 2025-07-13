@@ -415,10 +415,10 @@ function Service:Connect(RemoteName: string | KnightRemote, callback: (...any) -
 			if RunService:IsServer() then
 				remote.OnServerInvoke = function(player, ...)
 					local args = table.pack(player, ...)
-					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
+					local middleware = self.Middleware[RemoteName] or self.Middleware["*"]
 
-					if middleware and not middleware(remote.Name, player, ...) then
-						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(remote.Name, player.Name))
+					if middleware and not middleware(RemoteName, player, ...) then
+						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(RemoteName, player.Name))
 						return
 					end
 
@@ -426,10 +426,10 @@ function Service:Connect(RemoteName: string | KnightRemote, callback: (...any) -
 				end
 			else
 				remote.OnClientInvoke = function(...)
-					local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
+					local middleware = self.Middleware[RemoteName] or self.Middleware["*"]
 
-					if middleware and not middleware(remote.Name, Players.LocalPlayer, ...) then
-						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(remote.Name, Players.LocalPlayer.Name))
+					if middleware and not middleware(RemoteName, Players.LocalPlayer, ...) then
+						warn(("[Knight:Remotes]: Dropped Event '%s' from '%s' as it failed middleware!"):format(RemoteName, Players.LocalPlayer.Name))
 						return
 					end
 
@@ -449,9 +449,9 @@ function Service:Connect(RemoteName: string | KnightRemote, callback: (...any) -
 				end
 
 				-- Handle middleware
-				local middleware = self.Middleware[remote.Name] or self.Middleware["*"]
-				if middleware and not middleware(remote.Name, playerArg, table.unpack(args)) then
-					warn(("[Knight:Remotes]: Dropped Event '%s' as it failed middleware!"):format(remote.Name))
+				local middleware = self.Middleware[RemoteName] or self.Middleware["*"]
+				if middleware and not middleware(RemoteName, playerArg, table.unpack(args)) then
+					warn(("[Knight:Remotes]: Dropped Event '%s' as it failed middleware!"):format(RemoteName))
 					return
 				end
 
