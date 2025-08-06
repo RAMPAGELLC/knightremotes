@@ -17,6 +17,15 @@
 	Remotes:Register(RemoteName: string, RemoteClass: string, Callback: any) -> void
 	Remotes:RegisterMiddleware(Target: string, Callback: (Player: Player, ...any) -> boolean): void
 	Remotes:UnregisterMiddleware(Target: string): void
+	Remotes:FireClients(RemoteName: string, players: { Player }, ...) -> (...any)
+
+	Aliases:
+	Remotes:FireClient(...) == Remotes:Fire(...)
+	Remotes:FireAllClients(...) == Remotes:FireAll(...)
+	Remotes:InvokeClient(...) == Remotes:Fire(...)
+	Remotes:InvokeServer(...) == Remotes:Fire(...)
+	Remotes:FireServer(...) == Remotes:Fire(...)
+	Remotes:Invoke(...) == Remotes:Fire(...)
 
 RemoteAPI Usage (Recieved from Get/GetAsync):
 	RemoteAPI:Fire(...) -> (...any)
@@ -30,8 +39,6 @@ RemoteAPI Usage (Recieved from Get/GetAsync):
 
 local Service = {
 	HashingEnabled = true, -- Requires "dekkonot/md5@1.0.0" from wally.
-	AutoRegisterIfDoesNotExist = false, -- Server :Fire() only. RemoteFunction is default. Useless unless client connects AFTER auto-creation.
-
 	RemoteAPICache = {},
 	Middleware = {},
 }
@@ -48,6 +55,8 @@ assert(
 	Maid,
 	"[Knight Library]: Maid not found in ReplicatedStorage.Packages. Please use the Knight framework or install maid manually."
 )
+
+local MAX_REMOTE_WAIT_TIME = 15
 
 local MD5 = if Packages:FindFirstChild("md5") then require(Packages.md5) else nil
 
@@ -95,29 +104,26 @@ local function GetRemoteName(RemoteName: string): string
 		RemoteName = RemoteName:gsub(":", "_")
 	end
 
-	return if Service.HashingEnabled and MD5 then MD5(RemoteName)[1] else RemoteName
+	return if Service.HashingEnabled and MD5 then MD5(RemoteName) else RemoteName
 end
 
-local function GetRemote(RemoteName: string): KnightRemote | boolean
-	RemoteName = GetRemoteName(RemoteName)
-
-	local remote = Events:FindFirstChild(RemoteName)
+local function GetRemote(OriginalRemoteName: string): KnightRemote | boolean
+	local RemoteName = GetRemoteName(OriginalRemoteName)
+	local remote = Events:FindFirstChild(RemoteName) or Events:WaitForChild(RemoteName, MAX_REMOTE_WAIT_TIME)
 
 	if not remote then
-		if Service.AutoRegisterIfDoesNotExist and RunService:IsServer() then
-			remote = Instance.new("RemoteFunction")
-			remote.Parent = Events
-			remote.Name = RemoteName
-			warn(("%s does not exist, remote was auto-created as a remote function."):format(RemoteName))
-			return remote
-		end
-
 		warn(
-			("Remote '%s' was not found. You must manually create the event or register it with the API."):format(
-				RemoteName
+			("Remote '%s' (%s) was not found. You must manually create the event or register it with the API. Trace: %s"):format(
+				RemoteName,
+				OriginalRemoteName,
+				debug.traceback()
 			)
 		)
 		return false
+	end
+
+	if RunService:IsStudio() then
+		remote:SetAttribute("OriginalName", OriginalRemoteName)
 	end
 
 	return remote
@@ -526,7 +532,7 @@ function Service:Connect(
 					return
 				end
 
-				return callback(...);
+				return callback(...)
 			end)
 		end
 	end
@@ -539,6 +545,7 @@ function Service:Unregister(RemoteName: string): void
 	RemoteName = GetRemoteName(RemoteName)
 
 	if not Events:FindFirstChild(RemoteName) then
+		warn(("[Knight:Remotes]: Remote '%s' is not registered!"):format(RemoteName))
 		return
 	end
 
@@ -555,6 +562,7 @@ function Service:Register(RemoteName: string, RemoteClass: string, Callback: any
 	RemoteName = GetRemoteName(RemoteName)
 
 	if Events:FindFirstChild(RemoteName) then
+		warn(("[Knight:Remotes]: Remote '%s' is already registered!"):format(RemoteName))
 		return
 	end
 
@@ -566,7 +574,21 @@ function Service:Register(RemoteName: string, RemoteClass: string, Callback: any
 		return
 	end
 
-	return Service:Connect(RemoteName, Callback)
+	return Service:Connect(Remote, Callback)
 end
+
+function Service:FireClients(remoteName, players: { Player }, ...)
+	for _, player in pairs(players) do
+		self:Fire(remoteName, player, ...)
+	end
+end
+
+-- Aliases
+Service.FireClient = Service.Fire
+Service.FireAllClients = Service.FireAll
+Service.FireServer = Service.Fire
+Service.InvokeClient = Service.Fire
+Service.InvokeServer = Service.Fire
+Service.Invoke = Service.Fire
 
 return Service
